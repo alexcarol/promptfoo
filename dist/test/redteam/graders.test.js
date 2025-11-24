@@ -1,0 +1,81 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const graders_1 = require("../../src/redteam/graders");
+const aegis_1 = require("../../src/redteam/plugins/aegis");
+const asciiSmuggling_1 = require("../../src/redteam/plugins/asciiSmuggling");
+const beavertails_1 = require("../../src/redteam/plugins/beavertails");
+const bias_1 = require("../../src/redteam/plugins/bias");
+const financialCalculationError_1 = require("../../src/redteam/plugins/financial/financialCalculationError");
+const financialComplianceViolation_1 = require("../../src/redteam/plugins/financial/financialComplianceViolation");
+const financialDataLeakage_1 = require("../../src/redteam/plugins/financial/financialDataLeakage");
+const financialHallucination_1 = require("../../src/redteam/plugins/financial/financialHallucination");
+const financialSycophancy_1 = require("../../src/redteam/plugins/financial/financialSycophancy");
+const graders_2 = require("../../src/redteam/plugins/harmful/graders");
+const mcp_1 = require("../../src/redteam/plugins/mcp");
+const medicalAnchoringBias_1 = require("../../src/redteam/plugins/medical/medicalAnchoringBias");
+const medicalHallucination_1 = require("../../src/redteam/plugins/medical/medicalHallucination");
+const offTopic_1 = require("../../src/redteam/plugins/offTopic");
+const pliny_1 = require("../../src/redteam/plugins/pliny");
+const toolDiscovery_1 = require("../../src/redteam/plugins/toolDiscovery");
+const toxicChat_1 = require("../../src/redteam/plugins/toxicChat");
+const unsafebench_1 = require("../../src/redteam/plugins/unsafebench");
+describe('getGraderById', () => {
+    it('should return correct grader for valid ID', () => {
+        const asciiGrader = (0, graders_1.getGraderById)('promptfoo:redteam:ascii-smuggling');
+        expect(asciiGrader).toBeInstanceOf(asciiSmuggling_1.AsciiSmugglingGrader);
+        const beavertailsGrader = (0, graders_1.getGraderById)('promptfoo:redteam:beavertails');
+        expect(beavertailsGrader).toBeInstanceOf(beavertails_1.BeavertailsGrader);
+        const harmfulGrader = (0, graders_1.getGraderById)('promptfoo:redteam:harmful');
+        expect(harmfulGrader).toBeInstanceOf(graders_2.HarmfulGrader);
+        const unsafebenchGrader = (0, graders_1.getGraderById)('promptfoo:redteam:unsafebench');
+        expect(unsafebenchGrader).toBeInstanceOf(unsafebench_1.UnsafeBenchGrader);
+        const plinyGrader = (0, graders_1.getGraderById)('promptfoo:redteam:pliny');
+        expect(plinyGrader).toBeInstanceOf(pliny_1.PlinyGrader);
+        const toxicChatGrader = (0, graders_1.getGraderById)('promptfoo:redteam:toxic-chat');
+        expect(toxicChatGrader).toBeInstanceOf(toxicChat_1.ToxicChatGrader);
+        const financialCalculationGrader = (0, graders_1.getGraderById)('promptfoo:redteam:financial:calculation-error');
+        expect(financialCalculationGrader).toBeInstanceOf(financialCalculationError_1.FinancialCalculationErrorPluginGrader);
+        const financialComplianceGrader = (0, graders_1.getGraderById)('promptfoo:redteam:financial:compliance-violation');
+        expect(financialComplianceGrader).toBeInstanceOf(financialComplianceViolation_1.FinancialComplianceViolationPluginGrader);
+        const financialDataLeakageGrader = (0, graders_1.getGraderById)('promptfoo:redteam:financial:data-leakage');
+        expect(financialDataLeakageGrader).toBeInstanceOf(financialDataLeakage_1.FinancialDataLeakagePluginGrader);
+        const financialHallucinationGrader = (0, graders_1.getGraderById)('promptfoo:redteam:financial:hallucination');
+        expect(financialHallucinationGrader).toBeInstanceOf(financialHallucination_1.FinancialHallucinationPluginGrader);
+        const financialSycophancyGrader = (0, graders_1.getGraderById)('promptfoo:redteam:financial:sycophancy');
+        expect(financialSycophancyGrader).toBeInstanceOf(financialSycophancy_1.FinancialSycophancyPluginGrader);
+        const aegisGrader = (0, graders_1.getGraderById)('promptfoo:redteam:aegis');
+        expect(aegisGrader).toBeInstanceOf(aegis_1.AegisGrader);
+        const mcpGrader = (0, graders_1.getGraderById)('promptfoo:redteam:mcp');
+        expect(mcpGrader).toBeInstanceOf(mcp_1.MCPPluginGrader);
+        const medicalAnchoringBiasGrader = (0, graders_1.getGraderById)('promptfoo:redteam:medical:anchoring-bias');
+        expect(medicalAnchoringBiasGrader).toBeInstanceOf(medicalAnchoringBias_1.MedicalAnchoringBiasPluginGrader);
+        const medicalHallucinationGrader = (0, graders_1.getGraderById)('promptfoo:redteam:medical:hallucination');
+        expect(medicalHallucinationGrader).toBeInstanceOf(medicalHallucination_1.MedicalHallucinationPluginGrader);
+        const offTopicGrader = (0, graders_1.getGraderById)('promptfoo:redteam:off-topic');
+        expect(offTopicGrader).toBeInstanceOf(offTopic_1.OffTopicPluginGrader);
+        const toolDiscoveryGrader = (0, graders_1.getGraderById)('promptfoo:redteam:tool-discovery');
+        expect(toolDiscoveryGrader).toBeInstanceOf(toolDiscovery_1.ToolDiscoveryGrader);
+        const biasGrader = (0, graders_1.getGraderById)('promptfoo:redteam:bias');
+        expect(biasGrader).toBeInstanceOf(bias_1.BiasGrader);
+    });
+    it('should return specific grader for misinformation-disinformation', () => {
+        const misinformationGrader = (0, graders_1.getGraderById)('promptfoo:redteam:harmful:misinformation-disinformation');
+        expect(misinformationGrader).toBeInstanceOf(graders_2.MisinformationDisinformationGrader);
+        expect(misinformationGrader?.id).toBe('promptfoo:redteam:harmful:misinformation-disinformation');
+    });
+    it('should return harmful grader for IDs starting with promptfoo:redteam:harmful', () => {
+        const specificHarmfulGrader = (0, graders_1.getGraderById)('promptfoo:redteam:harmful:specific-type');
+        expect(specificHarmfulGrader).toBeInstanceOf(graders_2.HarmfulGrader);
+        const anotherHarmfulGrader = (0, graders_1.getGraderById)('promptfoo:redteam:harmful:another-type');
+        expect(anotherHarmfulGrader).toBeInstanceOf(graders_2.HarmfulGrader);
+    });
+    it('should return undefined for invalid ID', () => {
+        const invalidGrader = (0, graders_1.getGraderById)('invalid-id');
+        expect(invalidGrader).toBeUndefined();
+    });
+    it('should return undefined for empty ID', () => {
+        const emptyGrader = (0, graders_1.getGraderById)('');
+        expect(emptyGrader).toBeUndefined();
+    });
+});
+//# sourceMappingURL=graders.test.js.map

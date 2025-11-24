@@ -1,0 +1,202 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const tokenUsageUtils_1 = require("../../src/util/tokenUsageUtils");
+describe('tokenUsageUtils', () => {
+    describe('createEmptyTokenUsage', () => {
+        it('should create an empty token usage object with all fields initialized to zero', () => {
+            const result = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            expect(result).toEqual({
+                prompt: 0,
+                completion: 0,
+                cached: 0,
+                total: 0,
+                numRequests: 0,
+                completionDetails: {
+                    reasoning: 0,
+                    acceptedPrediction: 0,
+                    rejectedPrediction: 0,
+                },
+                assertions: {
+                    total: 0,
+                    prompt: 0,
+                    completion: 0,
+                    cached: 0,
+                    numRequests: 0,
+                    completionDetails: {
+                        reasoning: 0,
+                        acceptedPrediction: 0,
+                        rejectedPrediction: 0,
+                    },
+                },
+            });
+        });
+        it('should return Required<TokenUsage> type', () => {
+            const result = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            // This test checks that all optional fields are actually present
+            expect(result.prompt).toBeDefined();
+            expect(result.completion).toBeDefined();
+            expect(result.cached).toBeDefined();
+            expect(result.total).toBeDefined();
+            expect(result.numRequests).toBeDefined();
+            expect(result.completionDetails).toBeDefined();
+            expect(result.assertions).toBeDefined();
+        });
+    });
+    describe('accumulateTokenUsage', () => {
+        it('should accumulate basic token fields', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            const update = {
+                prompt: 10,
+                completion: 20,
+                cached: 5,
+                total: 30,
+            };
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, update);
+            expect(target.prompt).toBe(10);
+            expect(target.completion).toBe(20);
+            expect(target.cached).toBe(5);
+            expect(target.total).toBe(30);
+        });
+        it('should handle undefined update gracefully', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            const originalTarget = { ...target };
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, undefined);
+            expect(target).toEqual(originalTarget);
+        });
+        it('should accumulate numRequests when provided', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { numRequests: 3 });
+            expect(target.numRequests).toBe(3);
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { numRequests: 2 });
+            expect(target.numRequests).toBe(5);
+        });
+        it('should increment numRequests by 1 when incrementRequests is true and numRequests not provided', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { total: 10 }, true);
+            expect(target.numRequests).toBe(1);
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { total: 5 }, true);
+            expect(target.numRequests).toBe(2);
+        });
+        it('should not increment numRequests when incrementRequests is false and numRequests not provided', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { total: 10 }, false);
+            expect(target.numRequests).toBe(0);
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, { total: 5 });
+            expect(target.numRequests).toBe(0);
+        });
+        it('should accumulate completion details', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, {
+                completionDetails: {
+                    reasoning: 5,
+                    acceptedPrediction: 3,
+                    rejectedPrediction: 2,
+                },
+            });
+            expect(target.completionDetails).toEqual({
+                reasoning: 5,
+                acceptedPrediction: 3,
+                rejectedPrediction: 2,
+            });
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, {
+                completionDetails: {
+                    reasoning: 10,
+                },
+            });
+            expect(target.completionDetails).toEqual({
+                reasoning: 15,
+                acceptedPrediction: 3,
+                rejectedPrediction: 2,
+            });
+        });
+        it('should accumulate assertion tokens', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, {
+                assertions: {
+                    total: 10,
+                    prompt: 5,
+                    completion: 5,
+                    cached: 2,
+                },
+            });
+            expect(target.assertions?.total).toBe(10);
+            expect(target.assertions?.prompt).toBe(5);
+            expect(target.assertions?.completion).toBe(5);
+            expect(target.assertions?.cached).toBe(2);
+        });
+        it('should accumulate assertion completion details', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, {
+                assertions: {
+                    completionDetails: {
+                        reasoning: 5,
+                        acceptedPrediction: 3,
+                    },
+                },
+            });
+            expect(target.assertions?.completionDetails).toMatchObject({
+                reasoning: 5,
+                acceptedPrediction: 3,
+            });
+        });
+        it('should handle missing fields with undefined or 0', () => {
+            const target = {
+                total: 10,
+                // Other fields undefined
+            };
+            (0, tokenUsageUtils_1.accumulateTokenUsage)(target, {
+                prompt: 5,
+                completion: 7,
+            });
+            expect(target.total).toBe(10);
+            expect(target.prompt).toBe(5);
+            expect(target.completion).toBe(7);
+            expect(target.cached).toBe(0); // addNumbers converts undefined to 0
+        });
+    });
+    describe('accumulateResponseTokenUsage', () => {
+        it('should accumulate token usage from response with tokenUsage', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            const response = {
+                tokenUsage: {
+                    total: 100,
+                    prompt: 60,
+                    completion: 40,
+                    numRequests: 1,
+                },
+            };
+            (0, tokenUsageUtils_1.accumulateResponseTokenUsage)(target, response);
+            expect(target.total).toBe(100);
+            expect(target.prompt).toBe(60);
+            expect(target.completion).toBe(40);
+            expect(target.numRequests).toBe(1);
+        });
+        it('should increment numRequests when response exists but has no tokenUsage', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            const response = {};
+            (0, tokenUsageUtils_1.accumulateResponseTokenUsage)(target, response);
+            expect(target.numRequests).toBe(1);
+            expect(target.total).toBe(0);
+        });
+        it('should handle undefined response', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateResponseTokenUsage)(target, undefined);
+            expect(target.numRequests).toBe(0);
+            expect(target.total).toBe(0);
+        });
+        it('should accumulate multiple responses', () => {
+            const target = (0, tokenUsageUtils_1.createEmptyTokenUsage)();
+            (0, tokenUsageUtils_1.accumulateResponseTokenUsage)(target, {
+                tokenUsage: { total: 50, prompt: 30, completion: 20, numRequests: 1 },
+            });
+            (0, tokenUsageUtils_1.accumulateResponseTokenUsage)(target, {
+                tokenUsage: { total: 30, prompt: 20, completion: 10, numRequests: 1 },
+            });
+            expect(target.total).toBe(80);
+            expect(target.prompt).toBe(50);
+            expect(target.completion).toBe(30);
+            expect(target.numRequests).toBe(2);
+        });
+    });
+});
+//# sourceMappingURL=tokenUsageUtils.test.js.map

@@ -1,0 +1,1 @@
+{"version":3,"file":"testModule.js","sourceRoot":"","sources":["../../../test/__fixtures__/testModule.ts"],"names":[],"mappings":";;;AAAA,sCAAsC;AAC/B,MAAM,YAAY,GAAG,GAAW,EAAE,CAAC,gBAAgB,CAAC;AAA9C,QAAA,YAAY,gBAAkC;AAC9C,QAAA,WAAW,GAAW,iBAAiB,CAAC;AAOrD,MAAM,aAAa,GAAe;IAChC,YAAY,EAAE,GAAG,EAAE,CAAC,wBAAwB;IAC5C,WAAW,EAAE,qBAAqB;CACnC,CAAC;AAEF,kBAAe,aAAa,CAAC"}

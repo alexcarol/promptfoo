@@ -1,0 +1,1 @@
+{"version":3,"file":"diffProcessor.d.ts","sourceRoot":"","sources":["../../../../src/codeScan/git/diffProcessor.ts"],"names":[],"mappings":"AAAA;;;;;;;;;GASG;AAYH,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,sBAAsB,CAAC;AA4avD,wBAAsB,WAAW,CAC/B,QAAQ,EAAE,MAAM,EAChB,IAAI,EAAE,MAAM,EACZ,OAAO,GAAE,MAAe,GACvB,OAAO,CAAC,UAAU,EAAE,CAAC,CAuDvB"}

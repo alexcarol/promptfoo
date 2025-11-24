@@ -1,0 +1,455 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const telemetry_1 = require("../src/telemetry");
+const index_1 = require("../src/util/fetch/index");
+jest.mock('../src/util/fetch/index.ts', () => ({
+    fetchWithTimeout: jest.fn().mockResolvedValue({ ok: true }),
+    fetchWithProxy: jest.fn().mockResolvedValue({ ok: true }),
+}));
+jest.mock('crypto', () => ({
+    randomUUID: jest.fn().mockReturnValue('test-uuid'),
+}));
+jest.mock('../src/globalConfig/globalConfig', () => ({
+    readGlobalConfig: jest
+        .fn()
+        .mockReturnValue({ id: 'test-user-id', account: { email: 'test@example.com' } }),
+    writeGlobalConfig: jest.fn(),
+}));
+jest.mock('../src/constants', () => ({
+    ...jest.requireActual('../src/constants'),
+    VERSION: '1.0.0',
+}));
+jest.mock('../src/cliState', () => ({
+    __esModule: true,
+    default: {
+        config: undefined,
+    },
+}));
+jest.mock('../src/envars', () => ({
+    ...jest.requireActual('../src/envars'),
+    getEnvBool: jest.fn().mockImplementation((key) => {
+        if (key === 'PROMPTFOO_DISABLE_TELEMETRY') {
+            return process.env.PROMPTFOO_DISABLE_TELEMETRY === '1';
+        }
+        if (key === 'IS_TESTING') {
+            return process.env.IS_TESTING === 'true' || process.env.IS_TESTING === '1';
+        }
+        return false;
+    }),
+    getEnvString: jest.fn().mockImplementation((key) => {
+        if (key === 'PROMPTFOO_POSTHOG_KEY') {
+            return process.env.PROMPTFOO_POSTHOG_KEY || 'test-key';
+        }
+        if (key === 'PROMPTFOO_POSTHOG_HOST') {
+            return process.env.PROMPTFOO_POSTHOG_HOST || undefined;
+        }
+        if (key === 'NODE_ENV') {
+            return process.env.NODE_ENV || undefined;
+        }
+        return undefined;
+    }),
+    isCI: jest.fn().mockReturnValue(false),
+}));
+jest.mock('../src/logger', () => ({
+    __esModule: true,
+    default: {
+        debug: jest.fn(),
+    },
+}));
+jest.mock('../src/globalConfig/accounts', () => ({
+    isLoggedIntoCloud: jest.fn().mockReturnValue(false),
+    getAuthMethod: jest.fn().mockReturnValue('none'),
+    getUserEmail: jest.fn().mockReturnValue('test@example.com'),
+    getUserId: jest.fn().mockReturnValue('test-user-id'),
+}));
+jest.mock('../src/constants/build', () => ({
+    POSTHOG_KEY: 'test-posthog-key',
+}));
+describe('Telemetry', () => {
+    let originalEnv;
+    let fetchWithProxySpy;
+    let sendEventSpy;
+    beforeEach(() => {
+        originalEnv = process.env;
+        process.env = { ...originalEnv };
+        process.env.PROMPTFOO_POSTHOG_KEY = 'test-key';
+        // Get the mocked fetchWithProxy function
+        fetchWithProxySpy = index_1.fetchWithProxy;
+        fetchWithProxySpy.mockClear();
+        fetchWithProxySpy.mockResolvedValue({ ok: true });
+        sendEventSpy = jest.spyOn(telemetry_1.Telemetry.prototype, 'sendEvent');
+        jest.useFakeTimers();
+    });
+    afterEach(() => {
+        process.env = originalEnv;
+        jest.clearAllMocks();
+        jest.restoreAllMocks();
+        jest.useRealTimers();
+        // Reset isCI mock to default value to prevent test pollution
+        const isCI = jest.requireMock('../src/envars').isCI;
+        isCI.mockReturnValue(false);
+    });
+    it('should not track events with PostHog when telemetry is disabled', () => {
+        process.env.PROMPTFOO_DISABLE_TELEMETRY = '1';
+        const _telemetry = new telemetry_1.Telemetry();
+        _telemetry.record('eval_ran', { foo: 'bar' });
+        expect(sendEventSpy).not.toHaveBeenCalledWith('eval_ran', expect.anything());
+    });
+    it('should include version in telemetry events', () => {
+        process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+        const _telemetry = new telemetry_1.Telemetry();
+        _telemetry.record('eval_ran', { foo: 'bar' });
+        expect(sendEventSpy).toHaveBeenCalledWith('eval_ran', { foo: 'bar' });
+        expect(fetchWithProxySpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+            method: 'POST',
+        }));
+        const fetchCalls = fetchWithProxySpy.mock.calls;
+        let foundVersion = false;
+        for (const call of fetchCalls) {
+            if (call[1] &&
+                call[1].body &&
+                typeof call[1].body === 'string' &&
+                call[1].body.includes('packageVersion')) {
+                foundVersion = true;
+                break;
+            }
+        }
+        expect(foundVersion).toBe(true);
+    });
+    it('should include version and CI status in telemetry events', async () => {
+        jest.useRealTimers(); // Temporarily use real timers for this test
+        process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+        delete process.env.IS_TESTING; // Clear IS_TESTING to allow fetch calls
+        const isCI = jest.requireMock('../src/envars').isCI;
+        const originalMockValue = isCI.getMockImplementation();
+        isCI.mockReturnValue(true);
+        fetchWithProxySpy.mockClear();
+        const _telemetry = new telemetry_1.Telemetry();
+        _telemetry.record('feature_used', { test: 'value' });
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        const fetchCalls = fetchWithProxySpy.mock.calls;
+        expect(fetchCalls.length).toBeGreaterThan(0);
+        let foundExpectedProperties = false;
+        for (const call of fetchCalls) {
+            if (call[1] && call[1].body && typeof call[1].body === 'string') {
+                try {
+                    const data = JSON.parse(call[1].body);
+                    // Check for the structure sent to R_ENDPOINT
+                    if (data.meta) {
+                        // Verify that isRunningInCi property is present (value can be true or false depending on test order)
+                        if (data.meta.test === 'value' &&
+                            data.meta.packageVersion === '1.0.0' &&
+                            typeof data.meta.isRunningInCi === 'boolean') {
+                            foundExpectedProperties = true;
+                            break;
+                        }
+                    }
+                }
+                catch {
+                    // Skip JSON parse errors
+                }
+            }
+        }
+        expect(foundExpectedProperties).toBe(true);
+        // Restore original mock
+        if (originalMockValue) {
+            isCI.mockImplementation(originalMockValue);
+        }
+        else {
+            isCI.mockReturnValue(false);
+        }
+        process.env.IS_TESTING = 'true'; // Reset IS_TESTING
+        jest.useFakeTimers(); // Restore fake timers
+    });
+    it('should save consent successfully', async () => {
+        jest.mocked(index_1.fetchWithTimeout).mockResolvedValue({ ok: true });
+        const _telemetry = new telemetry_1.Telemetry();
+        await _telemetry.saveConsent('test@example.com', { source: 'test' });
+        expect(index_1.fetchWithTimeout).toHaveBeenCalledWith('https://api.promptfoo.dev/consent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: 'test@example.com', metadata: { source: 'test' } }),
+        }, 1000);
+    });
+    it('should handle failed consent save', async () => {
+        jest.mocked(index_1.fetchWithTimeout).mockResolvedValue({ ok: false, statusText: 'Not Found' });
+        const _telemetry = new telemetry_1.Telemetry();
+        await _telemetry.saveConsent('test@example.com', { source: 'test' });
+        expect(index_1.fetchWithTimeout).toHaveBeenCalledWith('https://api.promptfoo.dev/consent', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({
+                email: 'test@example.com',
+                metadata: { source: 'test' },
+            }),
+        }), 1000);
+    });
+    it('should not initialize PostHog client when telemetry is disabled', async () => {
+        process.env.PROMPTFOO_DISABLE_TELEMETRY = '1';
+        jest.resetModules();
+        // Re-establish fetch mocks after module reset
+        jest.doMock('../src/util/fetch/index.ts', () => ({
+            fetchWithTimeout: jest.fn().mockResolvedValue({ ok: true }),
+            fetchWithProxy: jest.fn().mockResolvedValue({ ok: true }),
+        }));
+        const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+        const telemetryInstance = telemetryModule.default;
+        telemetryInstance.record('eval_ran', { foo: 'bar' });
+        expect(sendEventSpy).toHaveBeenCalledTimes(0);
+    });
+    describe('PostHog client initialization', () => {
+        it('should initialize PostHog client when telemetry is enabled and POSTHOG_KEY is present', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            const mockPostHog = jest.fn().mockImplementation(() => ({
+                identify: jest.fn(),
+                capture: jest.fn(),
+                flush: jest.fn().mockResolvedValue(undefined),
+            }));
+            jest.resetModules();
+            // Re-establish fetch mocks after module reset
+            jest.doMock('../src/util/fetch/index.ts', () => ({
+                fetchWithTimeout: jest.fn().mockResolvedValue({ ok: true }),
+                fetchWithProxy: jest.fn().mockResolvedValue({ ok: true }),
+            }));
+            jest.doMock('posthog-node', () => ({
+                PostHog: mockPostHog,
+            }));
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await _telemetry.identify();
+            expect(mockPostHog).toHaveBeenCalledWith('test-posthog-key', {
+                host: 'https://a.promptfoo.app',
+                fetch: expect.any(Function),
+            });
+        });
+        it('should handle PostHog initialization errors gracefully', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            const mockPostHog = jest.fn().mockImplementation(() => {
+                throw new Error('PostHog initialization failed');
+            });
+            jest.resetModules();
+            // Re-establish fetch mocks after module reset
+            jest.doMock('../src/util/fetch/index.ts', () => ({
+                fetchWithTimeout: jest.fn().mockResolvedValue({ ok: true }),
+                fetchWithProxy: jest.fn().mockResolvedValue({ ok: true }),
+            }));
+            jest.doMock('posthog-node', () => ({
+                PostHog: mockPostHog,
+            }));
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await expect(_telemetry.identify()).resolves.not.toThrow();
+        });
+    });
+    describe('PostHog operations', () => {
+        let mockPostHogInstance;
+        let mockPostHog;
+        beforeEach(() => {
+            mockPostHogInstance = {
+                identify: jest.fn(),
+                capture: jest.fn(),
+                flush: jest.fn().mockResolvedValue(undefined),
+                on: jest.fn(), // Add the 'on' method for error handling
+            };
+            mockPostHog = jest.fn().mockImplementation(() => mockPostHogInstance);
+            // Clear all modules and re-mock
+            jest.resetModules();
+            jest.clearAllMocks();
+            // Re-establish fetch mocks after module reset
+            jest.doMock('../src/util/fetch/index.ts', () => ({
+                fetchWithTimeout: jest.fn().mockResolvedValue({ ok: true }),
+                fetchWithProxy: jest.fn().mockResolvedValue({ ok: true }),
+            }));
+            jest.doMock('posthog-node', () => ({
+                PostHog: mockPostHog,
+            }));
+        });
+        it('should call PostHog identify when telemetry is enabled', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await _telemetry.identify();
+            expect(mockPostHogInstance.identify).toHaveBeenCalledWith({
+                distinctId: 'test-user-id',
+                properties: {
+                    email: 'test@example.com',
+                    isLoggedIntoCloud: false,
+                    authMethod: 'none',
+                    isRunningInCi: false,
+                },
+            });
+            expect(mockPostHogInstance.flush).toHaveBeenCalledWith();
+        });
+        it('should handle PostHog identify errors gracefully', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            mockPostHogInstance.identify.mockImplementation(() => {
+                throw new Error('Identify failed');
+            });
+            const { default: logger } = await Promise.resolve().then(() => __importStar(require('../src/logger')));
+            const loggerSpy = jest.spyOn(logger, 'debug');
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await expect(_telemetry.identify()).resolves.not.toThrow();
+            expect(loggerSpy).toHaveBeenCalledWith('PostHog identify error: Error: Identify failed');
+        });
+        it('should call PostHog capture when sending events', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            _telemetry.record('eval_ran', { test: 'value' });
+            expect(mockPostHogInstance.capture).toHaveBeenCalledWith({
+                distinctId: 'test-user-id',
+                event: 'eval_ran',
+                properties: {
+                    test: 'value',
+                    packageVersion: '1.0.0',
+                    isRunningInCi: false,
+                },
+            });
+            expect(mockPostHogInstance.flush).toHaveBeenCalledWith();
+        });
+        it('should handle PostHog capture errors gracefully', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            mockPostHogInstance.capture.mockImplementation(() => {
+                throw new Error('Capture failed');
+            });
+            const { default: logger } = await Promise.resolve().then(() => __importStar(require('../src/logger')));
+            const loggerSpy = jest.spyOn(logger, 'debug');
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            expect(() => _telemetry.record('eval_ran', { test: 'value' })).not.toThrow();
+            expect(loggerSpy).toHaveBeenCalledWith('PostHog capture error: Error: Capture failed');
+        });
+        it('should handle PostHog flush errors silently', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            mockPostHogInstance.flush.mockRejectedValue(new Error('Flush failed'));
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await expect(_telemetry.identify()).resolves.not.toThrow();
+        });
+        it('should call PostHog shutdown when telemetry shutdown is called', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            mockPostHogInstance.shutdown = jest.fn().mockResolvedValue(undefined);
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await _telemetry.shutdown();
+            expect(mockPostHogInstance.shutdown).toHaveBeenCalled();
+        });
+        it('should handle PostHog shutdown errors gracefully', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '0';
+            delete process.env.IS_TESTING;
+            process.env.PROMPTFOO_POSTHOG_KEY = 'test-posthog-key';
+            mockPostHogInstance.shutdown = jest.fn().mockRejectedValue(new Error('Shutdown failed'));
+            const { default: logger } = await Promise.resolve().then(() => __importStar(require('../src/logger')));
+            const loggerSpy = jest.spyOn(logger, 'debug');
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await expect(_telemetry.shutdown()).resolves.not.toThrow();
+            expect(loggerSpy).toHaveBeenCalledWith('PostHog shutdown error: Error: Shutdown failed');
+        });
+        it('should handle shutdown when PostHog client is not initialized', async () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '1';
+            const telemetryModule = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new telemetryModule.Telemetry();
+            await expect(_telemetry.shutdown()).resolves.not.toThrow();
+        });
+    });
+    describe('telemetry disabled recording', () => {
+        it('should record telemetry disabled event only once', () => {
+            process.env.PROMPTFOO_DISABLE_TELEMETRY = '1';
+            const _telemetry = new telemetry_1.Telemetry();
+            _telemetry.record('eval_ran', { foo: 'bar' });
+            expect(sendEventSpy).toHaveBeenCalledWith('feature_used', { feature: 'telemetry disabled' });
+            expect(sendEventSpy).toHaveBeenCalledTimes(1);
+            sendEventSpy.mockClear();
+            _telemetry.record('command_used', { name: 'test' });
+            expect(sendEventSpy).not.toHaveBeenCalled();
+        });
+    });
+    describe('consent save error handling', () => {
+        it('should handle network errors when saving consent', async () => {
+            const mockError = new Error('Network error');
+            // Reset modules to ensure clean state
+            jest.resetModules();
+            // Re-mock fetchWithTimeout
+            jest.doMock('../src/util/fetch', () => ({
+                fetchWithTimeout: jest.fn().mockRejectedValue(mockError),
+            }));
+            // Re-mock logger to capture debug calls
+            jest.doMock('../src/logger', () => ({
+                __esModule: true,
+                default: {
+                    debug: jest.fn(),
+                },
+            }));
+            const { default: logger } = await Promise.resolve().then(() => __importStar(require('../src/logger')));
+            const { Telemetry: TelemetryClass } = await Promise.resolve().then(() => __importStar(require('../src/telemetry')));
+            const _telemetry = new TelemetryClass();
+            await _telemetry.saveConsent('test@example.com');
+            expect(logger.debug).toHaveBeenCalledWith('Failed to save consent: Network error');
+        });
+        it('should save consent without metadata', async () => {
+            jest.mocked(index_1.fetchWithTimeout).mockResolvedValue({ ok: true });
+            const _telemetry = new telemetry_1.Telemetry();
+            await _telemetry.saveConsent('test@example.com');
+            expect(index_1.fetchWithTimeout).toHaveBeenCalledWith('https://api.promptfoo.dev/consent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: 'test@example.com', metadata: undefined }),
+            }, 1000);
+        });
+    });
+});
+//# sourceMappingURL=telemetry.test.js.map

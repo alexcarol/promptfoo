@@ -1,0 +1,1 @@
+{"version":3,"file":"embedding.d.ts","sourceRoot":"","sources":["../../../../src/providers/azure/embedding.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,oBAAoB,EAAE,MAAM,WAAW,CAAC;AAEjD,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,mBAAmB,CAAC;AAEnE,qBAAa,sBAAuB,SAAQ,oBAAoB;IACxD,gBAAgB,CAAC,IAAI,EAAE,MAAM,GAAG,OAAO,CAAC,yBAAyB,CAAC;CAwEzE"}

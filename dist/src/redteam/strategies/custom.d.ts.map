@@ -1,0 +1,1 @@
+{"version":3,"file":"custom.d.ts","sourceRoot":"","sources":["../../../../src/redteam/strategies/custom.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,QAAQ,EAAE,MAAM,mBAAmB,CAAC;AAElD,wBAAgB,SAAS,CACvB,SAAS,EAAE,QAAQ,EAAE,EACrB,SAAS,EAAE,MAAM,EACjB,MAAM,EAAE,MAAM,CAAC,MAAM,EAAE,GAAG,CAAC,EAC3B,UAAU,GAAE,MAAiB,GAC5B,QAAQ,EAAE,CA6BZ"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"monkeyPatchFetch.d.ts","sourceRoot":"","sources":["../../../../src/util/fetch/monkeyPatchFetch.ts"],"names":[],"mappings":"AAOA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAa5C;;GAEG;AAEH,wBAAsB,gBAAgB,CACpC,GAAG,EAAE,MAAM,GAAG,GAAG,GAAG,OAAO,EAC3B,OAAO,CAAC,EAAE,YAAY,GACrB,OAAO,CAAC,QAAQ,CAAC,CAsEnB"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"socket.d.ts","sourceRoot":"","sources":["../../../../src/codeScan/scanner/socket.ts"],"names":[],"mappings":"AAAA;;;;GAIG;AAEH,OAAO,EAAM,KAAK,MAAM,EAAE,MAAM,kBAAkB,CAAC;AAEnD,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,sBAAsB,CAAC;AAElE;;;;;;;GAOG;AACH,wBAAsB,sBAAsB,CAC1C,OAAO,EAAE,MAAM,EACf,IAAI,EAAE,qBAAqB,GAC1B,OAAO,CAAC,MAAM,CAAC,CAkEjB"}
