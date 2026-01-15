@@ -128,16 +128,16 @@ export const handleJavascript = async ({
   let score;
   try {
     if (typeof assertion.value === 'function') {
-      const ret = assertion.value(outputString, assertionValueContext);
-      const result = await validateResult(ret);
+      let ret = assertion.value(outputString, assertionValueContext);
+      ret = await validateResult(ret);
       const functionString = assertion.value.toString();
       const assertionObj = {
-        type: 'javascript' as const,
+        type: 'javascript',
         value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
       };
 
-      if (typeof result === 'boolean') {
-        const finalPass = result !== inverse;
+      if (typeof ret === 'boolean') {
+        const finalPass = ret !== inverse;
         return {
           pass: finalPass,
           score: finalPass ? 1 : 0,
@@ -146,12 +146,12 @@ export const handleJavascript = async ({
             : `Custom function returned ${inverse ? 'true' : 'false'}`,
           assertion: assertionObj,
         };
-      } else if (typeof result === 'number') {
-        const originalPass = result > 0;
+      } else if (typeof ret === 'number') {
+        const originalPass = ret > 0;
         const finalPass = inverse ? !originalPass : originalPass;
         return {
           pass: finalPass,
-          score: inverse ? 1 - result : result,
+          score: inverse ? 1 - ret : ret,
           reason: finalPass
             ? 'Assertion passed'
             : `Custom function returned ${inverse ? 'true' : 'false'}`,
@@ -159,17 +159,17 @@ export const handleJavascript = async ({
         };
       } else {
         // GradingResult
-        if (!result.assertion) {
-          result.assertion = assertionObj;
+        if (!ret.assertion) {
+          ret.assertion = assertionObj;
         }
         if (inverse) {
           return {
-            ...result,
-            pass: !result.pass,
-            score: 1 - (result.score ?? 0),
+            ...ret,
+            pass: !ret.pass,
+            score: 1 - (ret.score ?? 0),
           };
         }
-        return result;
+        return ret;
       }
     }
     invariant(typeof renderedValue === 'string', 'javascript assertion must have a string value');
