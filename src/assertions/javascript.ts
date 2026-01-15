@@ -128,56 +128,24 @@ export const handleJavascript = async ({
   let score;
   try {
     if (typeof assertion.value === 'function') {
-      const ret = assertion.value(outputString, assertionValueContext);
-      const validatedRet = await validateResult(ret);
-      const functionString = assertion.value.toString();
-      const assertionObj = {
-        type: 'javascript' as const,
-        value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
-      };
-
-      // Handle boolean, number, or GradingResult return types with inverse support
-      if (typeof validatedRet === 'boolean') {
-        const finalPass = validatedRet !== inverse;
-        return {
-          pass: finalPass,
-          score: finalPass ? 1 : 0,
-          reason: finalPass
-            ? 'Assertion passed'
-            : `Custom function returned ${inverse ? 'true' : 'false'}`,
-          assertion: assertionObj,
+      let ret = assertion.value(outputString, assertionValueContext);
+      ret = await validateResult(ret);
+      if (!ret.assertion) {
+        // Populate the assertion object if the custom function didn't return it.
+        const functionString = assertion.value.toString();
+        ret.assertion = {
+          type: 'javascript',
+          value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
         };
-      } else if (typeof validatedRet === 'number') {
-        // First calculate pass based on original score
-        const originalPass = validatedRet > 0;
-        // Invert pass if needed
-        const finalPass = inverse ? !originalPass : originalPass;
-        // Invert score for display
-        const effectiveScore = inverse ? 1 - validatedRet : validatedRet;
-        return {
-          pass: finalPass,
-          score: effectiveScore,
-          reason: finalPass
-            ? 'Assertion passed'
-            : `Custom function returned ${inverse ? 'true' : 'false'}`,
-          assertion: assertionObj,
-        };
-      } else {
-        // GradingResult object
-        if (inverse) {
-          const invertedScore = 1 - (validatedRet.score ?? 0);
-          return {
-            ...validatedRet,
-            pass: !validatedRet.pass,
-            score: invertedScore,
-            assertion: validatedRet.assertion ?? assertionObj,
-          };
-        }
-        if (!validatedRet.assertion) {
-          validatedRet.assertion = assertionObj;
-        }
-        return validatedRet;
       }
+      if (inverse) {
+        return {
+          ...ret,
+          pass: !ret.pass,
+          score: 1 - (ret.score ?? 0),
+        };
+      }
+      return ret;
     }
     invariant(typeof renderedValue === 'string', 'javascript assertion must have a string value');
 
