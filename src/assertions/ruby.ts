@@ -11,6 +11,7 @@ export const handleRuby = async ({
   valueFromScript,
   assertionValueContext,
   output,
+  inverse,
 }: AssertionParams): Promise<GradingResult> => {
   invariant(typeof renderedValue === 'string', 'ruby assertion must have a string value');
   let pass;
@@ -50,14 +51,14 @@ end
       (typeof result === 'boolean' && result) ||
       (typeof result === 'string' && result.toLowerCase() === 'true')
     ) {
-      pass = true;
-      score = 1.0;
+      pass = !inverse; // true becomes false when inverted
+      score = inverse ? 0.0 : 1.0;
     } else if (
       (typeof result === 'boolean' && !result) ||
       (typeof result === 'string' && result.toLowerCase() === 'false')
     ) {
-      pass = false;
-      score = 0.0;
+      pass = inverse; // false becomes true when inverted
+      score = inverse ? 1.0 : 0.0;
     } else if (typeof result === 'string' && result.startsWith('{')) {
       let parsed;
       try {
@@ -70,7 +71,16 @@ end
           `Ruby assertion must return a boolean, number, or {pass, score, reason} object. Got instead: ${result}`,
         );
       }
-      return parsed;
+      if (inverse) {
+        const invertedScore = 1 - (parsed.score ?? 0);
+        return {
+          ...parsed,
+          pass: !parsed.pass,
+          score: invertedScore,
+          assertion,
+        };
+      }
+      return { ...parsed, assertion };
     } else if (typeof result === 'object') {
       const obj = result;
 
@@ -87,6 +97,13 @@ end
         );
       }
       const rubyGradingResult = mappedObj as Omit<GradingResult, 'assertion'>;
+
+      // Apply inverse before threshold check
+      if (inverse) {
+        rubyGradingResult.pass = !rubyGradingResult.pass;
+        rubyGradingResult.score = 1 - (rubyGradingResult.score ?? 0);
+      }
+
       if (assertion.threshold !== undefined && rubyGradingResult.score < assertion.threshold) {
         rubyGradingResult.pass = false;
         const scoreMessage = `Ruby score ${rubyGradingResult.score} is less than threshold ${assertion.threshold}`;
@@ -105,6 +122,10 @@ end
           `Ruby assertion must return a boolean, number, or {pass, score, reason} object. Instead got:\n${result}`,
         );
       }
+      // Apply inverse to numeric score
+      if (inverse) {
+        score = 1 - score;
+      }
       pass = assertion.threshold !== undefined ? score >= assertion.threshold : score > 0;
     }
   } catch (err) {
@@ -120,7 +141,7 @@ end
     score,
     reason: pass
       ? 'Assertion passed'
-      : `Ruby code returned ${pass ? 'true' : 'false'}\n${assertion.value}`,
+      : `Ruby code returned ${inverse ? 'true' : 'false'}\n${assertion.value}`,
     assertion,
   };
 };

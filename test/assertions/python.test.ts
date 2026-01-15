@@ -497,6 +497,156 @@ describe('Python file references', { timeout: 15000 }, () => {
     expect(pythonResult).not.toHaveProperty('tokensUsed');
   });
 
+  describe('not-python inverse assertions', () => {
+    const baseParams = {
+      prompt: 'test',
+      provider: new OpenAiChatCompletionProvider('gpt-4o-mini'),
+      test: {} as AtomicTestCase,
+      providerResponse: { output: 'test output' },
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(runPythonCode).mockReset();
+      vi.mocked(runPython).mockReset();
+      pythonUtils.state.cachedPythonPath = null;
+      pythonUtils.state.validationPromise = null;
+    });
+
+    it('should invert boolean true to fail for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce(true);
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: 'True',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      expect(result.pass).toBe(false);
+      expect(result.reason).toContain('Python code returned true');
+    });
+
+    it('should invert boolean false to pass for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce(false);
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: 'False',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      expect(result.pass).toBe(true);
+      expect(result.reason).toBe('Assertion passed');
+    });
+
+    it('should invert numeric score for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce(0.8);
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: '0.8',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      // A positive score should fail when inverted
+      expect(result.pass).toBe(false);
+      expect(result.score).toBe(0.2); // inverted: 1 - 0.8
+    });
+
+    it('should invert zero numeric score to pass for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce(0);
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: '0',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      // A zero score should pass when inverted
+      expect(result.pass).toBe(true);
+      expect(result.score).toBe(1); // inverted: 1 - 0
+    });
+
+    it('should invert GradingResult for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce({
+        pass: true,
+        score: 0.9,
+        reason: 'original reason',
+      });
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: '{"pass": true, "score": 0.9, "reason": "original reason"}',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      // A passing result should fail when inverted
+      expect(result.pass).toBe(false);
+      expect(result.score).toBe(0.1); // inverted: 1 - 0.9
+    });
+
+    it('should invert failing GradingResult to pass for not-python', async () => {
+      vi.mocked(runPythonCode).mockResolvedValueOnce({
+        pass: false,
+        score: 0.2,
+        reason: 'original reason',
+      });
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: '{"pass": false, "score": 0.2, "reason": "original reason"}',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      // A failing result should pass when inverted
+      expect(result.pass).toBe(true);
+      expect(result.score).toBe(0.8); // inverted: 1 - 0.2
+    });
+
+    it('should handle not-python with file:// reference', async () => {
+      vi.mocked(path.resolve).mockReturnValue('/path/to/assert.py');
+      vi.mocked(path.extname).mockReturnValue('.py');
+      vi.mocked(runPython).mockResolvedValueOnce(true);
+
+      const assertion: Assertion = {
+        type: 'not-python',
+        value: 'file:///path/to/assert.py',
+      };
+
+      const result: GradingResult = await runAssertion({
+        ...baseParams,
+        assertion,
+      });
+
+      // File returning true should fail when inverted
+      expect(result.pass).toBe(false);
+    });
+  });
+
   describe('Python threshold edge cases', () => {
     const baseParams = {
       prompt: 'test',

@@ -128,17 +128,52 @@ export const handleJavascript = async ({
   let score;
   try {
     if (typeof assertion.value === 'function') {
-      let ret = assertion.value(outputString, assertionValueContext);
-      ret = await validateResult(ret);
-      if (!ret.assertion) {
-        // Populate the assertion object if the custom function didn't return it.
-        const functionString = assertion.value.toString();
-        ret.assertion = {
-          type: 'javascript',
-          value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
+      const ret = assertion.value(outputString, assertionValueContext);
+      const validatedRet = await validateResult(ret);
+      const functionString = assertion.value.toString();
+      const assertionObj = {
+        type: 'javascript' as const,
+        value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
+      };
+
+      // Handle boolean, number, or GradingResult return types with inverse support
+      if (typeof validatedRet === 'boolean') {
+        const finalPass = validatedRet !== inverse;
+        return {
+          pass: finalPass,
+          score: finalPass ? 1 : 0,
+          reason: finalPass
+            ? 'Assertion passed'
+            : `Custom function returned ${inverse ? 'true' : 'false'}`,
+          assertion: assertionObj,
         };
+      } else if (typeof validatedRet === 'number') {
+        const effectiveScore = inverse ? 1 - validatedRet : validatedRet;
+        const finalPass = effectiveScore > 0;
+        return {
+          pass: finalPass,
+          score: effectiveScore,
+          reason: finalPass
+            ? 'Assertion passed'
+            : `Custom function returned ${inverse ? 'true' : 'false'}`,
+          assertion: assertionObj,
+        };
+      } else {
+        // GradingResult object
+        if (inverse) {
+          const invertedScore = 1 - (validatedRet.score ?? 0);
+          return {
+            ...validatedRet,
+            pass: !validatedRet.pass,
+            score: invertedScore,
+            assertion: validatedRet.assertion ?? assertionObj,
+          };
+        }
+        if (!validatedRet.assertion) {
+          validatedRet.assertion = assertionObj;
+        }
+        return validatedRet;
       }
-      return ret;
     }
     invariant(typeof renderedValue === 'string', 'javascript assertion must have a string value');
 
@@ -179,9 +214,22 @@ export const handleJavascript = async ({
       pass = result !== inverse;
       score = pass ? 1 : 0;
     } else if (typeof result === 'number') {
-      pass = assertion.threshold !== undefined ? result >= assertion.threshold : result > 0;
-      score = result;
+      const effectiveScore = inverse ? 1 - result : result;
+      pass =
+        assertion.threshold !== undefined
+          ? effectiveScore >= assertion.threshold
+          : effectiveScore > 0;
+      score = effectiveScore;
     } else if (typeof result === 'object') {
+      if (inverse) {
+        const invertedScore = 1 - (result.score ?? 0);
+        return {
+          ...result,
+          pass: !result.pass,
+          score: invertedScore,
+          assertion,
+        };
+      }
       return result;
     } else {
       throw new Error('Custom function must return a boolean or number');

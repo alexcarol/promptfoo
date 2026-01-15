@@ -11,6 +11,7 @@ export const handlePython = async ({
   valueFromScript,
   assertionValueContext,
   output,
+  inverse,
 }: AssertionParams): Promise<GradingResult> => {
   invariant(typeof renderedValue === 'string', 'python assertion must have a string value');
   let pass;
@@ -49,14 +50,14 @@ ${
       (typeof result === 'boolean' && result) ||
       (typeof result === 'string' && result.toLowerCase() === 'true')
     ) {
-      pass = true;
-      score = 1.0;
+      pass = !inverse; // true becomes false when inverted
+      score = inverse ? 0.0 : 1.0;
     } else if (
       (typeof result === 'boolean' && !result) ||
       (typeof result === 'string' && result.toLowerCase() === 'false')
     ) {
-      pass = false;
-      score = 0.0;
+      pass = inverse; // false becomes true when inverted
+      score = inverse ? 1.0 : 0.0;
     } else if (typeof result === 'string' && result.startsWith('{')) {
       let parsed;
       try {
@@ -69,7 +70,16 @@ ${
           `Python assertion must return a boolean, number, or {pass, score, reason} object. Got instead: ${result}`,
         );
       }
-      return parsed;
+      if (inverse) {
+        const invertedScore = 1 - (parsed.score ?? 0);
+        return {
+          ...parsed,
+          pass: !parsed.pass,
+          score: invertedScore,
+          assertion,
+        };
+      }
+      return { ...parsed, assertion };
     } else if (typeof result === 'object') {
       const obj = result;
 
@@ -86,6 +96,13 @@ ${
         );
       }
       const pythonGradingResult = mappedObj as Omit<GradingResult, 'assertion'>;
+
+      // Apply inverse before threshold check
+      if (inverse) {
+        pythonGradingResult.pass = !pythonGradingResult.pass;
+        pythonGradingResult.score = 1 - (pythonGradingResult.score ?? 0);
+      }
+
       if (assertion.threshold !== undefined && pythonGradingResult.score < assertion.threshold) {
         pythonGradingResult.pass = false;
         const scoreMessage = `Python score ${pythonGradingResult.score} is less than threshold ${assertion.threshold}`;
@@ -104,6 +121,10 @@ ${
           `Python assertion must return a boolean, number, or {pass, score, reason} object. Instead got:\n${result}`,
         );
       }
+      // Apply inverse to numeric score
+      if (inverse) {
+        score = 1 - score;
+      }
       pass = assertion.threshold !== undefined ? score >= assertion.threshold : score > 0;
     }
   } catch (err) {
@@ -119,7 +140,7 @@ ${
     score,
     reason: pass
       ? 'Assertion passed'
-      : `Python code returned ${pass ? 'true' : 'false'}\n${assertion.value}`,
+      : `Python code returned ${inverse ? 'true' : 'false'}\n${assertion.value}`,
     assertion,
   };
 };
