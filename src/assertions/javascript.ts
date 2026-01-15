@@ -148,8 +148,12 @@ export const handleJavascript = async ({
           assertion: assertionObj,
         };
       } else if (typeof validatedRet === 'number') {
+        // First calculate pass based on original score
+        const originalPass = validatedRet > 0;
+        // Invert pass if needed
+        const finalPass = inverse ? !originalPass : originalPass;
+        // Invert score for display
         const effectiveScore = inverse ? 1 - validatedRet : validatedRet;
-        const finalPass = effectiveScore > 0;
         return {
           pass: finalPass,
           score: effectiveScore,
@@ -214,12 +218,13 @@ export const handleJavascript = async ({
       pass = result !== inverse;
       score = pass ? 1 : 0;
     } else if (typeof result === 'number') {
-      const effectiveScore = inverse ? 1 - result : result;
-      pass =
-        assertion.threshold !== undefined
-          ? effectiveScore >= assertion.threshold
-          : effectiveScore > 0;
-      score = effectiveScore;
+      // First calculate pass based on original score
+      const originalPass =
+        assertion.threshold !== undefined ? result >= assertion.threshold : result > 0;
+      // Invert pass if needed
+      pass = inverse ? !originalPass : originalPass;
+      // Invert score for display
+      score = inverse ? 1 - result : result;
     } else if (typeof result === 'object') {
       if (inverse) {
         const invertedScore = 1 - (result.score ?? 0);

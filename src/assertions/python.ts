@@ -121,11 +121,15 @@ ${
           `Python assertion must return a boolean, number, or {pass, score, reason} object. Instead got:\n${result}`,
         );
       }
-      // Apply inverse to numeric score
+      // First calculate pass based on original score
+      const originalPass =
+        assertion.threshold !== undefined ? score >= assertion.threshold : score > 0;
+      // Invert pass if needed
+      pass = inverse ? !originalPass : originalPass;
+      // Invert score for display
       if (inverse) {
         score = 1 - score;
       }
-      pass = assertion.threshold !== undefined ? score >= assertion.threshold : score > 0;
     }
   } catch (err) {
     return {

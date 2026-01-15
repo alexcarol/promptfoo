@@ -562,7 +562,7 @@ describe('Python file references', { timeout: 15000 }, () => {
 
       // A positive score should fail when inverted
       expect(result.pass).toBe(false);
-      expect(result.score).toBe(0.2); // inverted: 1 - 0.8
+      expect(result.score).toBeCloseTo(0.2); // inverted: 1 - 0.8
     });
 
     it('should invert zero numeric score to pass for not-python', async () => {
@@ -602,7 +602,7 @@ describe('Python file references', { timeout: 15000 }, () => {
 
       // A passing result should fail when inverted
       expect(result.pass).toBe(false);
-      expect(result.score).toBe(0.1); // inverted: 1 - 0.9
+      expect(result.score).toBeCloseTo(0.1); // inverted: 1 - 0.9
     });
 
     it('should invert failing GradingResult to pass for not-python', async () => {

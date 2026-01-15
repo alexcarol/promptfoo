@@ -3,15 +3,14 @@ import * as path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runAssertion } from '../../src/assertions/index';
 import { OpenAiChatCompletionProvider } from '../../src/providers/openai/chat';
-import { runRubyCode } from '../../src/ruby/wrapper';
 import * as rubyUtils from '../../src/ruby/rubyUtils';
+import { runRubyCode } from '../../src/ruby/wrapper';
 
 import type { Assertion, AtomicTestCase, GradingResult } from '../../src/types/index';
 
 vi.mock('../../src/ruby/wrapper', async () => {
-  const actual = await vi.importActual<typeof import('../../src/ruby/wrapper')>(
-    '../../src/ruby/wrapper',
-  );
+  const actual =
+    await vi.importActual<typeof import('../../src/ruby/wrapper')>('../../src/ruby/wrapper');
   return {
     ...actual,
     runRubyCode: vi.fn(actual.runRubyCode),
@@ -146,7 +145,7 @@ describe('not-ruby inverse assertions', () => {
 
     // A positive score should fail when inverted
     expect(result.pass).toBe(false);
-    expect(result.score).toBe(0.2); // inverted: 1 - 0.8
+    expect(result.score).toBeCloseTo(0.2); // inverted: 1 - 0.8
   });
 
   it('should invert zero numeric score to pass for not-ruby', async () => {
@@ -186,7 +185,7 @@ describe('not-ruby inverse assertions', () => {
 
     // A passing result should fail when inverted
     expect(result.pass).toBe(false);
-    expect(result.score).toBe(0.1); // inverted: 1 - 0.9
+    expect(result.score).toBeCloseTo(0.1); // inverted: 1 - 0.9
   });
 
   it('should invert failing GradingResult to pass for not-ruby', async () => {
