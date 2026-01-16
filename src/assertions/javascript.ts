@@ -1,8 +1,7 @@
-import { type GradingResult, isGradingResult } from '../types/index';
+import type { Assertion, AssertionParams, GradingResult } from '../types/index';
 import invariant from '../util/invariant';
 import { getProcessShim } from '../util/processShim';
-
-import type { AssertionParams } from '../types/index';
+import { processScriptResult } from './processScriptResult';
 
 /**
  * Checks if a character at the given index is escaped by backslashes.
@@ -102,18 +101,17 @@ export function buildFunctionBody(code: string): string {
   return `return ${trimmed}`;
 }
 
-const validateResult = async (result: unknown): Promise<boolean | number | GradingResult> => {
-  result = await Promise.resolve(result);
-  if (typeof result === 'boolean' || typeof result === 'number' || isGradingResult(result)) {
-    return result;
-  } else {
-    throw new Error(
-      `Custom function must return a boolean, number, or GradingResult object. Got type ${typeof result}: ${JSON.stringify(
-        result,
-      )}`,
-    );
-  }
-};
+/**
+ * Creates an assertion object for function-based assertions.
+ * Truncates the function string if it's too long.
+ */
+function createFunctionAssertion(fn: Function): Assertion {
+  const functionString = fn.toString();
+  return {
+    type: 'javascript',
+    value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
+  };
+}
 
 export const handleJavascript = async ({
   assertion,
@@ -124,54 +122,19 @@ export const handleJavascript = async ({
   output,
   inverse,
 }: AssertionParams): Promise<GradingResult> => {
-  let pass;
-  let score;
   try {
+    // Case 1: Direct function
     if (typeof assertion.value === 'function') {
-      let ret = assertion.value(outputString, assertionValueContext);
-      ret = await validateResult(ret);
-      const functionString = assertion.value.toString();
-      const assertionObj = {
-        type: 'javascript',
-        value: functionString.length > 50 ? functionString.slice(0, 50) + '...' : functionString,
-      };
-
-      if (typeof ret === 'boolean') {
-        const finalPass = ret !== inverse;
-        return {
-          pass: finalPass,
-          score: finalPass ? 1 : 0,
-          reason: finalPass
-            ? 'Assertion passed'
-            : `Custom function returned ${inverse ? 'true' : 'false'}`,
-          assertion: assertionObj,
-        };
-      } else if (typeof ret === 'number') {
-        const originalPass = ret > 0;
-        const finalPass = inverse ? !originalPass : originalPass;
-        return {
-          pass: finalPass,
-          score: inverse ? 1 - ret : ret,
-          reason: finalPass
-            ? 'Assertion passed'
-            : `Custom function returned ${inverse ? 'true' : 'false'}`,
-          assertion: assertionObj,
-        };
-      } else {
-        // GradingResult
-        if (!ret.assertion) {
-          ret.assertion = assertionObj;
-        }
-        if (inverse) {
-          return {
-            ...ret,
-            pass: !ret.pass,
-            score: 1 - (ret.score ?? 0),
-          };
-        }
-        return ret;
-      }
+      const raw = await Promise.resolve(assertion.value(outputString, assertionValueContext));
+      return processScriptResult(raw, {
+        inverse,
+        threshold: assertion.threshold,
+        assertion: createFunctionAssertion(assertion.value),
+        runtime: 'javascript',
+      });
     }
+
+    // Case 2: String assertion (inline or file://)
     invariant(typeof renderedValue === 'string', 'javascript assertion must have a string value');
 
     /**
@@ -185,8 +148,12 @@ export const handleJavascript = async ({
      */
     renderedValue = renderedValue.trimEnd();
 
-    let result: boolean | number | GradingResult;
-    if (typeof valueFromScript === 'undefined') {
+    let raw: unknown;
+    if (typeof valueFromScript !== 'undefined') {
+      // Result from file:// execution
+      raw = valueFromScript;
+    } else {
+      // Inline code - build and execute function
       // Multiline assertions use the value as-is (user controls returns)
       // Single-line assertions get processed to handle variable declarations
       const functionBody = renderedValue.includes('\n')
@@ -194,44 +161,16 @@ export const handleJavascript = async ({
         : buildFunctionBody(renderedValue);
       // Pass process shim for ESM compatibility - allows process.mainModule.require to work
       const customFunction = new Function('output', 'context', 'process', functionBody);
-      result = await validateResult(
-        customFunction(output, assertionValueContext, getProcessShim()),
-      );
-    } else {
-      invariant(
-        typeof valueFromScript === 'boolean' ||
-          typeof valueFromScript === 'number' ||
-          typeof valueFromScript === 'object',
-        `Javascript assertion script must return a boolean, number, or object (${assertion.value})`,
-      );
-      result = await validateResult(valueFromScript);
+      raw = customFunction(output, assertionValueContext, getProcessShim());
     }
 
-    if (typeof result === 'boolean') {
-      pass = result !== inverse;
-      score = pass ? 1 : 0;
-    } else if (typeof result === 'number') {
-      // First calculate pass based on original score
-      const originalPass =
-        assertion.threshold !== undefined ? result >= assertion.threshold : result > 0;
-      // Invert pass if needed
-      pass = inverse ? !originalPass : originalPass;
-      // Invert score for display
-      score = inverse ? 1 - result : result;
-    } else if (typeof result === 'object') {
-      if (inverse) {
-        const invertedScore = 1 - (result.score ?? 0);
-        return {
-          ...result,
-          pass: !result.pass,
-          score: invertedScore,
-          assertion,
-        };
-      }
-      return result;
-    } else {
-      throw new Error('Custom function must return a boolean or number');
-    }
+    return processScriptResult(raw, {
+      inverse,
+      threshold: assertion.threshold,
+      assertion,
+      runtime: 'javascript',
+      codeSnippet: renderedValue,
+    });
   } catch (err) {
     return {
       pass: false,
@@ -242,13 +181,4 @@ ${renderedValue}`,
       assertion,
     };
   }
-  return {
-    pass,
-    score,
-    reason: pass
-      ? 'Assertion passed'
-      : `Custom function returned ${inverse ? 'true' : 'false'}
-${renderedValue}`,
-    assertion,
-  };
 };
