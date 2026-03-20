@@ -275,6 +275,56 @@ describe('ClaudeCodeSDKProvider', () => {
 
       warnSpy.mockRestore();
     });
+
+    it('should require an Anthropic API key by default', () => {
+      delete process.env.CLAUDE_CODE_USE_BEDROCK;
+      delete process.env.CLAUDE_CODE_USE_VERTEX;
+
+      const provider = new ClaudeCodeSDKProvider();
+
+      expect(provider.requiresApiKey()).toBe(true);
+    });
+
+    it('should not require an Anthropic API key when Bedrock mode is enabled', () => {
+      const provider = new ClaudeCodeSDKProvider({
+        env: { CLAUDE_CODE_USE_BEDROCK: 'true' },
+      });
+
+      expect(provider.requiresApiKey()).toBe(false);
+    });
+
+    it('should not require an Anthropic API key when Vertex mode is enabled', () => {
+      const provider = new ClaudeCodeSDKProvider({
+        env: { CLAUDE_CODE_USE_VERTEX: 'true' },
+      });
+
+      expect(provider.requiresApiKey()).toBe(false);
+    });
+
+    it('should not require an Anthropic API key when auth_method is bedrock', () => {
+      const provider = new ClaudeCodeSDKProvider({
+        config: { auth_method: 'bedrock' },
+      });
+
+      expect(provider.requiresApiKey()).toBe(false);
+    });
+
+    it('should not require an Anthropic API key when auth_method is vertex', () => {
+      const provider = new ClaudeCodeSDKProvider({
+        config: { auth_method: 'vertex' },
+      });
+
+      expect(provider.requiresApiKey()).toBe(false);
+    });
+
+    it('should require an Anthropic API key when auth_method is anthropic', () => {
+      const provider = new ClaudeCodeSDKProvider({
+        config: { auth_method: 'anthropic' },
+        env: { CLAUDE_CODE_USE_BEDROCK: 'true' },
+      });
+
+      expect(provider.requiresApiKey()).toBe(true);
+    });
   });
 
   describe('callApi', () => {
@@ -430,6 +480,77 @@ describe('ClaudeCodeSDKProvider', () => {
 
         expect(result.error).toBeUndefined();
         expect(result.output).toBe('Response');
+
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+      });
+
+      it('should not throw when using auth_method: bedrock', async () => {
+        mockQuery.mockReturnValue(createMockResponse('Response'));
+
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+        delete process.env.CLAUDE_CODE_USE_VERTEX;
+
+        const provider = new ClaudeCodeSDKProvider({
+          config: { auth_method: 'bedrock' },
+        });
+
+        const result = await provider.callApi('Test prompt');
+
+        expect(result.error).toBeUndefined();
+        expect(result.output).toBe('Response');
+        expect(mockQuery).toHaveBeenCalledWith({
+          prompt: 'Test prompt',
+          options: expect.objectContaining({
+            env: expect.objectContaining({
+              CLAUDE_CODE_USE_BEDROCK: 'true',
+            }),
+          }),
+        });
+      });
+
+      it('should not throw when using auth_method: vertex', async () => {
+        mockQuery.mockReturnValue(createMockResponse('Response'));
+
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+        delete process.env.CLAUDE_CODE_USE_VERTEX;
+
+        const provider = new ClaudeCodeSDKProvider({
+          config: { auth_method: 'vertex' },
+        });
+
+        const result = await provider.callApi('Test prompt');
+
+        expect(result.error).toBeUndefined();
+        expect(result.output).toBe('Response');
+        expect(mockQuery).toHaveBeenCalledWith({
+          prompt: 'Test prompt',
+          options: expect.objectContaining({
+            env: expect.objectContaining({
+              CLAUDE_CODE_USE_VERTEX: 'true',
+            }),
+          }),
+        });
+      });
+
+      it('should respect auth_method over conflicting environment flags', async () => {
+        mockQuery.mockReturnValue(createMockResponse('Response'));
+
+        process.env.CLAUDE_CODE_USE_BEDROCK = 'true';
+        delete process.env.CLAUDE_CODE_USE_VERTEX;
+
+        const provider = new ClaudeCodeSDKProvider({
+          config: { auth_method: 'anthropic' },
+          env: { ANTHROPIC_API_KEY: 'test-api-key' },
+        });
+
+        const result = await provider.callApi('Test prompt');
+
+        expect(result.error).toBeUndefined();
+        expect(result.output).toBe('Response');
+        const mockQueryArg = mockQuery.mock.calls.at(-1)?.[0];
+        expect(mockQueryArg?.prompt).toBe('Test prompt');
+        expect(mockQueryArg?.options?.env?.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+        expect(mockQueryArg?.options?.env?.CLAUDE_CODE_USE_VERTEX).toBeUndefined();
 
         delete process.env.CLAUDE_CODE_USE_BEDROCK;
       });

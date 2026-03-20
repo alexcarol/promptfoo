@@ -47,9 +47,20 @@ export ANTHROPIC_API_KEY=your_api_key_here
 
 Apart from using the Anthropic API, you can also use AWS Bedrock and Google Vertex AI.
 
+The recommended way to select these modes in Promptfoo is with `auth_method` in provider config.
+
 For AWS Bedrock:
 
-- Set the `CLAUDE_CODE_USE_BEDROCK` environment variable to `true`:
+- Set `auth_method: bedrock` in provider config:
+
+```yaml
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      auth_method: bedrock
+```
+
+- Or set the `CLAUDE_CODE_USE_BEDROCK` environment variable to `true`:
 
 ```sh
 export CLAUDE_CODE_USE_BEDROCK=true
@@ -59,7 +70,16 @@ export CLAUDE_CODE_USE_BEDROCK=true
 
 For Google Vertex:
 
-- Set the `CLAUDE_CODE_USE_VERTEX` environment variable to `true`:
+- Set `auth_method: vertex` in provider config:
+
+```yaml
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      auth_method: vertex
+```
+
+- Or set the `CLAUDE_CODE_USE_VERTEX` environment variable to `true`:
 
 ```sh
 export CLAUDE_CODE_USE_VERTEX=true
@@ -126,6 +146,7 @@ prompts:
 | Parameter                            | Type         | Description                                                                                                  | Default                  |
 | ------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------ |
 | `apiKey`                             | string       | Anthropic API key                                                                                            | Environment variable     |
+| `auth_method`                        | string       | Authentication mode: `anthropic`, `bedrock`, or `vertex`                                                     | `anthropic`              |
 | `working_dir`                        | string       | Directory for file operations                                                                                | Temporary directory      |
 | `model`                              | string       | Primary model to use (passed to Claude Agent SDK)                                                            | Claude Agent SDK default |
 | `fallback_model`                     | string       | Fallback model if primary fails                                                                              | Claude Agent SDK default |

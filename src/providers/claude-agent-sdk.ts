@@ -123,6 +123,7 @@ async function loadClaudeCodeSDK(): Promise<typeof import('@anthropic-ai/claude-
 
 export interface ClaudeCodeOptions {
   apiKey?: string;
+  auth_method?: 'anthropic' | 'bedrock' | 'vertex';
 
   /**
    * 'working_dir' allows user to point to a pre-prepared directory with desired files/directories in place
@@ -627,6 +628,24 @@ export class ClaudeCodeSDKProvider implements ApiProvider {
     return this.providerId;
   }
 
+  private getAuthMethod(
+    config: ClaudeCodeOptions = this.config,
+  ): 'anthropic' | 'bedrock' | 'vertex' {
+    if (config.auth_method) {
+      return config.auth_method;
+    }
+
+    if (this.env?.CLAUDE_CODE_USE_BEDROCK || getEnvString('CLAUDE_CODE_USE_BEDROCK')) {
+      return 'bedrock';
+    }
+
+    if (this.env?.CLAUDE_CODE_USE_VERTEX || getEnvString('CLAUDE_CODE_USE_VERTEX')) {
+      return 'vertex';
+    }
+
+    return 'anthropic';
+  }
+
   async callApi(
     prompt: string,
     context?: CallApiContextParams,
@@ -658,17 +677,28 @@ export class ClaudeCodeSDKProvider implements ApiProvider {
       }
     }
 
+    const authMethod = this.getAuthMethod(config);
+    if (authMethod === 'bedrock') {
+      env.CLAUDE_CODE_USE_BEDROCK = 'true';
+      delete env.CLAUDE_CODE_USE_VERTEX;
+    } else if (authMethod === 'vertex') {
+      env.CLAUDE_CODE_USE_VERTEX = 'true';
+      delete env.CLAUDE_CODE_USE_BEDROCK;
+    } else {
+      delete env.CLAUDE_CODE_USE_BEDROCK;
+      delete env.CLAUDE_CODE_USE_VERTEX;
+    }
+
     // Ensure API key is available to Claude Agent SDK
     if (this.apiKey) {
       env.ANTHROPIC_API_KEY = this.apiKey;
     }
 
-    // Could potentially do more to validate credentials for Bedrock/Vertex here, but Anthropic key is the main use case
-    if (!this.apiKey && !(env.CLAUDE_CODE_USE_BEDROCK || env.CLAUDE_CODE_USE_VERTEX)) {
+    if (!this.apiKey && authMethod === 'anthropic') {
       throw new Error(
         dedent`Anthropic API key is not set. Set the ANTHROPIC_API_KEY environment variable or add "apiKey" to the provider config.
 
-        Use CLAUDE_CODE_USE_BEDROCK or CLAUDE_CODE_USE_VERTEX environment variables to use Bedrock or Vertex instead.`,
+        Use auth_method: "bedrock" or auth_method: "vertex", or set CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX environment variables to use Bedrock or Vertex instead.`,
       );
     }
 
@@ -1000,6 +1030,10 @@ export class ClaudeCodeSDKProvider implements ApiProvider {
    */
   getApiKey(): string | undefined {
     return this.config?.apiKey || this.env?.ANTHROPIC_API_KEY || getEnvString('ANTHROPIC_API_KEY');
+  }
+
+  requiresApiKey(): boolean {
+    return this.getAuthMethod() === 'anthropic';
   }
 
   async cleanup(): Promise<void> {
